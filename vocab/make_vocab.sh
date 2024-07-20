@@ -1,0 +1,4 @@
+# python -m vocab_hf --corpus_path "heegyu/kowikitext,20221001" --vocab_size 32000 --limit_alphabet 6000 --tokenizer "sentencepiece" --model_type gpt --save_dir "data" --min_frequency 2
+python -m vocab_hf --corpus_path "heegyu/kowikitext,20221001" --vocab_size 32000 --tokenizer "bbpe" --model_type gpt --save_dir "data" --min_frequency 3 --split "train[:50%]"
+# python -m vocab_hf --corpus_path "heegyu/kowikitext,20221001" --vocab_size 32000 --limit_alphabet 6000 --tokenizer "wordpiece" --model_type bert --save_dir "data" --min_frequency 5
+# python -m vocab_hf --corpus_path 'cc100,lang="ko"' --vocab_size 50265 --tokenizer "bbpe" --model_type gpt --save_dir "cc100" --min_frequency 2 --split train[:"75%"]

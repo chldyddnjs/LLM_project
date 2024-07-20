@@ -1,0 +1,5 @@
+vocab/data*
+.pytest*
+data/*
+__pycache__
+LLMs.egg-info
