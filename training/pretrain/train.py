@@ -1,3 +1,6 @@
+"""
+    Code based by https://github.com/xyjigsaw/LLM-Pretrain-SFT/blob/master/llm_pretrain/pretrain.py
+"""
 import copy
 import logging
 import os
@@ -149,7 +152,7 @@ class DataCollatorForPretrainDataset(object):
         labels = torch.nn.utils.rnn.pad_sequence(
             _labels,
             batch_first=True,
-            padding_value=self.tokenizer.pad_token_id
+            padding_value=IGNORE_INDEX
         )
         logging.info('length of padded input_ids[0] : ',len(input_ids[0]) - len(_input_ids[0]))
         return dict(

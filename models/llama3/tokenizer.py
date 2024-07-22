@@ -3,7 +3,7 @@ from logging import getLogger
 from pathlib import Path
 import functools
 from concurrent.futures import ThreadPoolExecutor
- 
+
 from typing import (
     AbstractSet,
     cast,
@@ -264,13 +264,5 @@ class ChatFormat:
         return tokens
     
     def encode_dialog_prompt_batch(self,dialogs:Dialogs) -> List[int]:
-        batch = []
-        for dialog in dialogs:
-            tokens = []
-            tokens.append(self.tokenizer.special_tokens["<|begin_of_text|>"])
-            for message in dialog:
-                tokens.extend(self.encode_message(message))
-            #Add the start of an assistant message for the model to complete.
-            tokens.extend(self.encode_header({"role":"assistant", "content":""}))
-            batch.append(tokens)
+        batch = [self.encode_dialog_prompt(dialog) for dialog in dialogs]
         return batch 
