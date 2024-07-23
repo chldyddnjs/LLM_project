@@ -10,7 +10,18 @@ from typing import Dict,Optional,Sequence
 import wandb
 
 import torch
-from transformers import Trainer
+import torch.nn as nn
+from torch.utils.data import Dataset
+
+from datasets import load_dataset
+from transformers import (Trainer,
+                          TrainingArguments,
+                          PreTrainedTokenizer,
+                          PreTrainedModel,
+                          HfArgumentParser,
+                          AutoTokenizer,
+                          AutoModelForCausalLM
+                          )
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -27,7 +38,7 @@ class DataArguments:
     data_path: str = field(default="nayohan/raw_instruction_en_ko_translation")
 
 @dataclass
-class TrainingArguments(transformers.TrainingArguments):
+class TrainingArguments(TrainingArguments):
     cache_dir: Optional[str] = field(default=None)
     output_dir: Optional[str] = field(default='../output')
     optim:str = field(default="adamw_torch")
@@ -40,12 +51,12 @@ class TrainingArguments(transformers.TrainingArguments):
     save_strategy = "epoch",
     load_best_model_at_end=True,
     model_max_length: int = field(default=512)
-    use_lora: bool = field(default)
+    use_lora: bool = field(default=False)
 
 def smart_tokenizer_and_embedding_resize(
     special_tokens_dict: Dict,
-    tokenizer: transformers.PreTrainedTokenizer,
-    model: transformers.PreTrainedModel,
+    tokenizer: PreTrainedTokenizer,
+    model: PreTrainedModel,
 ):
     """Resize tokenizer and embedding.
 
@@ -64,23 +75,22 @@ def smart_tokenizer_and_embedding_resize(
         input_embeddings[-num_new_tokens:] = input_embeddings_avg
         output_embeddings[-num_new_tokens:] = output_embeddings_avg
 
-def _tokenize_fn(examples:Sequence[str], tokenizer: transformers.PreTrainedTokenizer):
+def _tokenize_fn(examples:Sequence[str], tokenizer: PreTrainedTokenizer):
     """Tokenize a list of strings."""
     tokenized_list = [
         tokenizer(
             example,
             return_tensors="pt",
             padding="longest",
-            max_length=tokenizer.model_max_length
-            truncation=True,
-        ) for example in examples
-    ]
+            max_length=tokenizer.model_max_length,
+            truncation=True
+        ) for example in examples ]
 
-    input_ids = labels = [tokenized.input_ids[0] for tokenzied in tokenized_list]
+    input_ids = labels = [tokenized.input_ids[0] for tokenized in tokenized_list]
     input_ids_lens = labels_lens = [
         tokenized.input_ids.ne(tokenizer.pad_token_id).sum().item() for tokenized in tokenized_list
     ]
-
+    
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -91,8 +101,8 @@ def _tokenize_fn(examples:Sequence[str], tokenizer: transformers.PreTrainedToken
 def preprocess(
     sources: Sequence[str],
     targets: Sequence[str],
-    tokenizer: transformers.PreTrainedTokenizer
-) -> Dict
+    tokenizer: PreTrainedTokenizer,
+) -> Dict:
     """Preproces the data by tokenizing"""
     examples = [s + t for s,t in zip(sources,targets)]
     examples_tokenized, sources_tokenized = [_tokenize_fn(example,tokenizer) for example in (examples,sources)]
@@ -105,7 +115,7 @@ def preprocess(
 class SupervisedDataset(Dataset):
     """Dataset for superviesed fine-tuning"""
 
-    def __init__(self, data_path:str, tokenizer: transformers.PreTrainedTokenizer)
+    def __init__(self, data_path:str, tokenizer: PreTrainedTokenizer)
         super(SupervisedDataset,self).__init__()
         logging.info("Loding data...")
 
@@ -113,8 +123,8 @@ class SupervisedDataset(Dataset):
         dataset = dataset.rename_column("korean","sources")
         dataset = dataset.rename_column("english","targets")
 
-        sources = datasets['sources']
-        targets = datasets['targets']
+        sources = dataset['sources']
+        targets = dataset['targets']
 
         logging.info("Tokenzing inputs... This may take some time")
         data_dict = preprocess(sources,targets,tokenizer)
@@ -123,7 +133,7 @@ class SupervisedDataset(Dataset):
         self.labels = data_dict["labels"]
 
     def __len__(self):
-        return len(self,input_ids)
+        return len(self.input_ids)
     
     def __getitem__(self,idx) -> Dict[str,torch.Tensor]:
         return dict(
@@ -132,10 +142,10 @@ class SupervisedDataset(Dataset):
                     )
 
 @dataclass
-class DataCollatorForSupervisedDataset(oject):
+class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
-    tokenzier: transformers.PreTrainedTokenizer
+    tokenzier: PreTrainedTokenizer
 
     def __call__(self,examples:Sequence[Dict]) -> Dict[str,torch.Tensor]:
         input_ids,labels = tuple([example[key] for example in examples] for key in ("input_ids","labels"))
@@ -149,23 +159,23 @@ class DataCollatorForSupervisedDataset(oject):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id)
         )
 
-def make_supervised_data_module(tokenizer:transformers.PreTrainedTokenizer,data_args) -> Dict:
+def make_supervised_data_module(tokenizer: PreTrainedTokenizer,data_args) -> Dict:
     """Make dataset and collator for supervised fine-tuning"""
     train_dataset = SupervisedDataset(tokenizer=tokenizer, data_path=args.data_path)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
 
 def train():
-    parser = transformers.HfArgumentParser((ModelArgs,DataArguments,TrainingArguments))
+    parser = HfArgumentParser((ModelArgs,DataArguments,TrainingArguments))
     model_args, data_args,training_args = parser.parse_args_into_dataclasses()
 
-    model = transformers.AutoModelForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        trust_remote_codeTrue,
+        trust_remote_code = True,
         cache_dir=training_args.cache_dir,
     )
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         trust_remote_code=True,
         cache_dir=training_args.cache_dir,

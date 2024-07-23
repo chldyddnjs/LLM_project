@@ -12,7 +12,7 @@ import torch
 import transformers
 import utils
 from torch.utils.data import Dataset
-from transformers import Trainer,TrainerCallback,GemmaConfig
+from transformers import Trainer,TrainerCallback
 from datasets import load_dataset
 
 IGNORE_INDEX = -100
@@ -60,7 +60,7 @@ def smart_tokenizer_and_embedding_resize(
     model.resize_token_embeddings(len(tokenizer))
 
     if num_new_tokens > 0:
-        input_embedding = model.get_input_embeddings().weight.data
+        input_embeddings = model.get_input_embeddings().weight.data
         output_embeddings = model.get_output_embeddings().weight.data
 
         input_embeddings_avg = input_embeddings[:-num_new_tokens].mean(dim=0,keepdim=True)
@@ -190,8 +190,6 @@ def main():
         cache_dir=training_args.cache_dir,
     )
 
-    model = model(config)
-
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         trust_remote_code=True, 
@@ -200,6 +198,16 @@ def main():
         padding_side="right",
         use_fast=False,
     )
+
+    special_tokens_dict = dict()
+    if tokenizer.pad_token is None:
+        special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+    if tokenizer.eos_token is None:
+        special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+    if tokenizer.bos_token is None:
+        special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+    if tokenizer.unk_token is None:
+        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
 
     smart_tokenizer_and_embedding_resize(
         special_tokens_dict=special_tokens_dict,
