@@ -175,17 +175,6 @@ class TransformerBLock(nn.Module):
         h = x + self.attention(self.attention_norm(x),start_pos,mask)
         out = h + self.feed_forward(self.ffn_norm(h))
         return out
-    
-    def _init_weights(self, module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
 
 class Transformer(nn.Module):
     _tied_weights_keys = ["lm_head.weight"]
@@ -216,6 +205,8 @@ class Transformer(nn.Module):
         self.lm_head = nn.Linear(
             args.dim,args.vocab_size,bias=False
         )
+
+        self._init_weights()
     
     def forward(self,tokens:torch.Tensor,start_pos:int):
         _bsz, seqlen = tokens.shape
