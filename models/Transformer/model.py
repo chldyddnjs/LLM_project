@@ -80,7 +80,7 @@ class Attention(nn.Module):
                 args.max_seq_len,
                 self.n_local_kv_heads,
                 self.head_dim
-            )#cuda
+            ).cuda()
         )
         self.cache_v = torch.zeros(
             (
@@ -88,7 +88,7 @@ class Attention(nn.Module):
                 args.max_seq_len,
                 self.n_local_kv_heads,
                 self.head_dim
-            )#cuda
+            ).cuda()
         )
     def forward(
             self,
